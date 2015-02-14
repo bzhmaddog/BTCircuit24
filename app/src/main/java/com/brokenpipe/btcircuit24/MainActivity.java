@@ -93,11 +93,7 @@ public class MainActivity extends ActionBarActivity {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progressValue, boolean fromUser) {
                 progress = progressValue;
-
                 char ch = (char) (progress + 49); // ascii values sent must be between 49 and 149
-
-                Log.v(TAG, "ascii : " + (progress +49) + " / " + ch);
-
                 sendMessage(Character.toString(ch));
             }
 
@@ -208,7 +204,7 @@ public class MainActivity extends ActionBarActivity {
     private void sendMessage(String message) {
         // Check that we're actually connected before trying anything
         if (mBluetoothService.getState() != BluetoothSerialService.STATE_CONNECTED) {
-            Toast.makeText(this, "You are not connected to the device", Toast.LENGTH_SHORT).show();
+            //Toast.makeText(this, "You are not connected to the device", Toast.LENGTH_SHORT).show();
             return;
         }
 

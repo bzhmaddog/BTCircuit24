@@ -12,14 +12,17 @@ import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.SeekBar;
 import android.widget.SeekBar.OnSeekBarChangeListener;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.os.Handler;
 import android.util.Log;
@@ -41,6 +44,8 @@ public class MainActivity extends ActionBarActivity {
     private static final int REQUEST_CONNECT_DEVICE = 1;
     private static final int REQUEST_ENABLE_BT = 2;
 
+    private static final int SETTINGS_CHANGED = 3;
+
     // Message types sent from the BluetoothChatService Handler
     public static final int MESSAGE_STATE_CHANGE = 1;
     public static final int MESSAGE_READ = 2;
@@ -58,13 +63,15 @@ public class MainActivity extends ActionBarActivity {
     private BluetoothSerialService mBluetoothService = null;
     private String mConnectedDeviceName = null;
 
-    private SeekBar powerBar;
     private int progress = 0;
     private int lastProgress = 0;
     private int currentTime = 0;
     private final Handler rHandler = new Handler();
 
-    private TextView mTitle;
+    private SeekBar powerBar;
+    private TextView statusView;
+    private ImageButton boostButton;
+    private Switch connectSwitch;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -82,6 +89,44 @@ public class MainActivity extends ActionBarActivity {
 
         // Get seekBar component
         powerBar = (SeekBar) findViewById(R.id.powerBar);
+        boostButton = (ImageButton) findViewById(R.id.boostButton);
+        statusView = (TextView) findViewById(R.id.statusTextView);
+        connectSwitch = (Switch) findViewById(R.id.connectSwitch);
+
+        /*connectSwitch.setOnTouchListener(new View.OnTouchListener(){
+
+            @Override
+            public boolean onTouch(View view, MotionEvent event) {
+                boolean on = !((Switch) view).isChecked();
+
+                Log.d(TAG, "SwitchTouch " + on);
+
+                if (on) {
+                    return false;
+                } else {
+                    return true;
+                }
+            }
+        });*/
+
+        connectSwitch.setOnLongClickListener(new View.OnLongClickListener(){
+
+            @Override
+            public boolean onLongClick(View view) {
+                boolean on = !((Switch) view).isChecked();
+
+                Log.d(TAG, "SwitchLongClick " + on);
+
+                if (!on) {
+                    if (mBluetoothService.getState() == BluetoothSerialService.STATE_CONNECTED) {
+                        mBluetoothService.stop();
+                    }
+                    return false;
+                } else {
+                    return true;
+                }
+            }
+        });
 
         // set the value to 0
         powerBar.setProgress(0);
@@ -113,6 +158,19 @@ public class MainActivity extends ActionBarActivity {
             }
         });
 
+        boostButton.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+            public void onClick(View arg0) {
+
+                /*Toast.makeText(MyAndroidAppActivity.this,
+                        "ImageButton (selector) is clicked!",
+                        Toast.LENGTH_SHORT).show();*/
+
+            }
+
+        });
+
         // If BT is not on, request that it be enabled.
         // setupChat() will then be called during onActivityResult
         if (!mBluetoothAdapter.isEnabled()) {
@@ -139,16 +197,19 @@ public class MainActivity extends ActionBarActivity {
                 case MESSAGE_STATE_CHANGE:
                     switch (msg.arg1) {
                         case BluetoothSerialService.STATE_CONNECTED:
-                            Toast.makeText(getApplicationContext(), "Connected To" + mConnectedDeviceName,
-                                    Toast.LENGTH_SHORT).show();
+                            /*Toast.makeText(getApplicationContext(), "Connected To" + mConnectedDeviceName,
+                                    Toast.LENGTH_SHORT).show();*/
+                            statusView.setText("Connected to : " + mConnectedDeviceName);
                             break;
                         case BluetoothSerialService.STATE_CONNECTING:
-                            Toast.makeText(getApplicationContext(), "Connecting",
-                                    Toast.LENGTH_SHORT).show();
+                            //Toast.makeText(getApplicationContext(), "Connecting",
+                            //        Toast.LENGTH_SHORT).show();//
+                            statusView.setText("Connecting ...");
                             break;
                         case BluetoothSerialService.STATE_LISTEN:
                         case BluetoothSerialService.STATE_NONE:
-                            //mTitle.setText("Not Connected");
+                            statusView.setText("Not Connected");
+                            connectSwitch.setChecked(false);
                             break;
                     }
                     break;
@@ -180,8 +241,6 @@ public class MainActivity extends ActionBarActivity {
                     BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(address);
                     // Attempt to connect to the device
                     mBluetoothService.connect(device);
-                    Toast.makeText(getApplicationContext(),device.getAddress(),
-                            Toast.LENGTH_SHORT).show();
                 }
                 break;
             case REQUEST_ENABLE_BT:
@@ -194,6 +253,9 @@ public class MainActivity extends ActionBarActivity {
                     Toast.makeText(this, "Leaving", Toast.LENGTH_SHORT).show();
                     finish();
                 }
+                break;
+            case SETTINGS_CHANGED:
+                // refresh settings
         }
     }
 
@@ -254,12 +316,25 @@ public class MainActivity extends ActionBarActivity {
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
             // Launch the DeviceListActivity to see devices and do scan
-            Intent serverIntent = new Intent(this, DeviceListActivity.class);
-            startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE);
+            Intent serverIntent = new Intent(this, SettingsActivity.class);
+            startActivityForResult(serverIntent, 0);
             return true;
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    public void onConnectSwitchClick(View view) {
+        // Is the toggle on?
+        boolean on = !((Switch) view).isChecked();
+
+        Log.d(TAG, "SwitchClick " + on);
+
+        if (!on) {
+            Intent serverIntent = new Intent(this, DeviceListActivity.class);
+            startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE);
+        } else {
+        }
     }
 
 }

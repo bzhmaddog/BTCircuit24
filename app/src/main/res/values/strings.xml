@@ -6,7 +6,14 @@
     <string name="title_activity_remote">RemoteActivity</string>
     <string name="title_activity_device_list">DeviceListActivity</string>
     <string name="NOT_CONNECTED">Not connected</string>
-    <string name="CONNECTING">Connecting ...</string>
+    <string name="CONNECTING">Connecting</string>
     <string name="CONNECTED">Connected to : %s</string>
-
+    <string name="DEVICE_LIST_ACTIVITY_TITLE">Choose device</string>
+    <string name="DEVICE_LIST_ACTIVITY_SCANNING">Scanning</string>
+    <string name="DEVICE_LIST_ACTIVITY_PAIRED_TITLE">Paired Devices</string>
+    <string name="DEVICE_LIST_ACTIVITY_FOUND_TITLE">Other Devices</string>
+    <string name="DEVICE_LIST_ACTIVITY_SCAN_BUTTON">Scan</string>
+    <string name="DEVICE_LIST_ACTIVITY_NO_DEVICE_FOUND">No Device found</string>
+    <string name="DEVICE_LIST_ACTIVITY_NO_PAIRED_DEVICE">No paired Devices</string>
+    <string name="NO_BLUETOOTH_ADAPTER">Bluetooth is not available</string>
 </resources>

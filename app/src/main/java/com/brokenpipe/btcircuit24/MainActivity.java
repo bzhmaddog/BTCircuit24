@@ -91,7 +91,7 @@ public class MainActivity extends ActionBarActivity {
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
         if (mBluetoothAdapter == null) {
-            Toast.makeText(this, "Bluetooth is not available", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, R.string.NO_BLUETOOTH_ADAPTER, Toast.LENGTH_LONG).show();
             finish();
             return;
         }
@@ -131,17 +131,16 @@ public class MainActivity extends ActionBarActivity {
         });
 
         boostButton.setOnClickListener(new View.OnClickListener() {
-
             @Override
             public void onClick(View arg0) {
-
-                /*Toast.makeText(MyAndroidAppActivity.this,
-                        "ImageButton (selector) is clicked!",
-                        Toast.LENGTH_SHORT).show();*/
-
             }
 
         });
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
 
         // If BT is not on, request that it be enabled.
         // setupChat() will then be called during onActivityResult
@@ -149,16 +148,60 @@ public class MainActivity extends ActionBarActivity {
             Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(enableIntent, REQUEST_ENABLE_BT);
         } else {
-            //mBluetoothService = new BluetoothSerialService(this, mHandler);
+            mBluetoothService = new BluetoothSerialService(this, mHandler);
         }
-        mBluetoothService = new BluetoothSerialService(this, mHandler);
+    }
+
+    @Override
+    public synchronized void onResume() {
+        super.onResume();
+
+        Log.v(TAG, "onResume");
+        if (mBluetoothService != null) {
+
+            if (mBluetoothService.getState() == BluetoothSerialService.STATE_NONE) {
+                Log.v(TAG, "STATE_NONE");
+
+                if (mConnectedDeviceAddress != null && mConnectedDeviceName != null) {
+                    connectToDevice(mConnectedDeviceAddress);
+                } else {
+                    Log.v(TAG, "No Reconnection Info");
+                }
+
+            } else if (mBluetoothService.getState() == BluetoothSerialService.STATE_CONNECTING) {
+                Log.v(TAG, "STATE_CONNECTING");
+            } else if (mBluetoothService.getState() == BluetoothSerialService.STATE_CONNECTED) {
+                Log.v(TAG, "STATE_CONNECTED");
+            }
+
+             /*if (mBluetoothService.getState() == BluetoothSerialService.STATE_NONE) {
+                mBluetoothService.start();
+             } else {
+                menu.findItem(R.id.action_connect).setIcon(R.drawable.led_red).setIcon(R.drawable.led_green);
+                setTitle(String.format(res.getString(R.string.CONNECTED), mConnectedDeviceName));
+            }*/
+        }
 
     }
 
     @Override
-    public void onStart() {
-        super.onStart();
+    public synchronized void onPause() {
+        super.onPause();
+        Log.v(TAG, "onPause");
+    }
 
+    @Override
+    public void onStop() {
+        super.onStop();
+        Log.v(TAG, "onStop");
+        if (mBluetoothService != null) mBluetoothService.stop();
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        Log.v(TAG, "onDestroy");
+        if (mBluetoothService != null) mBluetoothService.stop();
     }
 
     // The Handler that gets information back from the BluetoothChatService
@@ -210,9 +253,7 @@ public class MainActivity extends ActionBarActivity {
                     String address = data.getExtras()
                             .getString(DeviceListActivity.EXTRA_DEVICE_ADDRESS);
                     // Get the BLuetoothDevice object
-                    BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(address);
-                    // Attempt to connect to the device
-                    mBluetoothService.connect(device);
+                    connectToDevice(address);
                 }
                 break;
             case REQUEST_ENABLE_BT:
@@ -231,6 +272,14 @@ public class MainActivity extends ActionBarActivity {
         }
     }
 
+    private void connectToDevice(String address) {
+        if (mBluetoothService != null && mBluetoothAdapter != null) {
+            BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(address);
+            // Attempt to connect to the device
+            mBluetoothService.connect(device);
+        }
+    }
+
     /**
      * Sends a message.
      * @param message  A string of text to send.
@@ -238,7 +287,6 @@ public class MainActivity extends ActionBarActivity {
     private void sendMessage(String message) {
         // Check that we're actually connected before trying anything
         if (mBluetoothService.getState() != BluetoothSerialService.STATE_CONNECTED) {
-            //Toast.makeText(this, "You are not connected to the device", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -295,12 +343,14 @@ public class MainActivity extends ActionBarActivity {
                 startActivityForResult(serverIntent, 0);
                 return true;
             case R.id.action_connect :
-                if (mBluetoothService.getState() != BluetoothSerialService.STATE_CONNECTED) {
-                    serverIntent = new Intent(this, DeviceListActivity.class);
-                    startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE);
-                } else {
-                    BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(mConnectedDeviceAddress);
-                    mBluetoothService.disconnect(device);
+                if (mBluetoothService != null) {
+                    if (mBluetoothService.getState() != BluetoothSerialService.STATE_CONNECTED) {
+                        serverIntent = new Intent(this, DeviceListActivity.class);
+                        startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE);
+                    } else {
+                        BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(mConnectedDeviceAddress);
+                        mBluetoothService.stop();
+                    }
                 }
                 return true;
             default:

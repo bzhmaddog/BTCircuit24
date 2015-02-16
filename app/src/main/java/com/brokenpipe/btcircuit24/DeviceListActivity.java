@@ -48,7 +48,9 @@ public class DeviceListActivity extends Activity {
         requestWindowFeature(Window.FEATURE_INDETERMINATE_PROGRESS);
         setContentView(R.layout.activity_device_list);
 
-        // Set result CANCELED incase the user backs out
+        setTitle(R.string.DEVICE_LIST_ACTIVITY_TITLE);
+
+        // Set result CANCELED in case the user backs out
         setResult(Activity.RESULT_CANCELED);
 
         // Initialize the button to perform device discovery
@@ -96,7 +98,7 @@ public class DeviceListActivity extends Activity {
                 mPairedDevicesArrayAdapter.add(device.getName() + "\n" + device.getAddress());
             }
         } else {
-            String noDevices = "No Devices";
+            String noDevices = getResources().getString(R.string.DEVICE_LIST_ACTIVITY_NO_PAIRED_DEVICE);
             mPairedDevicesArrayAdapter.add(noDevices);
         }
     }
@@ -118,19 +120,18 @@ public class DeviceListActivity extends Activity {
      * Start device discover with the BluetoothAdapter
      */
     private void doDiscovery() {
-        if (D) Log.d(TAG, "doDiscovery()");
-
         // Indicate scanning in the title
         setProgressBarIndeterminateVisibility(true);
-        setTitle("Scanning");
-
-        // Turn on sub-title for new devices
-        findViewById(R.id.title_new_devices).setVisibility(View.VISIBLE);
+        setTitle(R.string.DEVICE_LIST_ACTIVITY_SCANNING);
 
         // If we're already discovering, stop it
         if (mBtAdapter.isDiscovering()) {
             mBtAdapter.cancelDiscovery();
         }
+
+        // Turn on sub-title and listview for new devices
+        findViewById(R.id.title_new_devices).setVisibility(View.VISIBLE);
+        findViewById(R.id.new_devices).setVisibility(View.VISIBLE);
 
         // Request discover from BluetoothAdapter
         mBtAdapter.startDiscovery();
@@ -174,9 +175,12 @@ public class DeviceListActivity extends Activity {
                 // When discovery is finished, change the Activity title
             } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
                 setProgressBarIndeterminateVisibility(false);
-                setTitle("Select Device");
+
+                findViewById(R.id.button_scan).setVisibility(View.VISIBLE);
+
+                setTitle(R.string.DEVICE_LIST_ACTIVITY_TITLE);
                 if (mNewDevicesArrayAdapter.getCount() == 0) {
-                    String noDevices = "No Device found";
+                    String noDevices = getResources().getString(R.string.DEVICE_LIST_ACTIVITY_NO_DEVICE_FOUND);
                     mNewDevicesArrayAdapter.add(noDevices);
                 }
             }

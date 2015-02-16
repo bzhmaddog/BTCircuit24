@@ -6,5 +6,7 @@
     <string name="title_activity_remote">RemoteActivity</string>
     <string name="title_activity_device_list">DeviceListActivity</string>
     <string name="NOT_CONNECTED">Not connected</string>
+    <string name="CONNECTING">Connecting ...</string>
+    <string name="CONNECTED">Connected to : %s</string>
 
 </resources>

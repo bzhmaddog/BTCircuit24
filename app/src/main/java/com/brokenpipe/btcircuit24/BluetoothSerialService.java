@@ -123,6 +123,17 @@ public class BluetoothSerialService {
         setState(STATE_CONNECTING);
     }
 
+    public synchronized void disconnect(BluetoothDevice device) {
+
+        if (mState == STATE_CONNECTED || mState == STATE_CONNECTING) {
+            if (mConnectThread != null) {
+                mConnectThread.cancel();
+                mConnectThread = null;
+                setState(STATE_NONE);
+            }
+        }
+    }
+
 
     /**
      * Start the ConnectedThread to begin managing a Bluetooth connection
@@ -146,9 +157,10 @@ public class BluetoothSerialService {
         mConnectedThread.start();
 
         // Send the name of the connected device back to the UI Activity
-        Message msg = mHandler.obtainMessage(MainActivity.MESSAGE_DEVICE_NAME);
+        Message msg = mHandler.obtainMessage(MainActivity.MESSAGE_DEVICE_INFO);
         Bundle bundle = new Bundle();
         bundle.putString(MainActivity.DEVICE_NAME, device.getName());
+        bundle.putString(MainActivity.DEVICE_ADDRESS, device.getAddress());
         msg.setData(bundle);
         mHandler.sendMessage(msg);
 

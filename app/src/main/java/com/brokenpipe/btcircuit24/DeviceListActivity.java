@@ -129,6 +129,9 @@ public class DeviceListActivity extends Activity {
             mBtAdapter.cancelDiscovery();
         }
 
+        // Clear discoverer devices list to avoid duplicates when scanning again
+        mNewDevicesArrayAdapter.clear();
+
         // Turn on sub-title and listview for new devices
         findViewById(R.id.title_new_devices).setVisibility(View.VISIBLE);
         findViewById(R.id.new_devices).setVisibility(View.VISIBLE);
@@ -175,6 +178,7 @@ public class DeviceListActivity extends Activity {
                 // When discovery is finished, change the Activity title
             } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
                 setProgressBarIndeterminateVisibility(false);
+
 
                 findViewById(R.id.button_scan).setVisibility(View.VISIBLE);
 

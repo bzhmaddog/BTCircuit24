@@ -1,41 +1,33 @@
 package com.brokenpipe.btcircuit24;
 
-//import android.bluetooth.*;
 import android.app.Activity;
-import android.bluetooth.BluetoothSocket;
-import android.content.BroadcastReceiver;
-import android.content.Context;
+import android.content.ClipData;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.res.Resources;
+import android.graphics.Point;
+import android.graphics.Rect;
 import android.os.Message;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
+import android.view.DragEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
+import android.view.SurfaceView;
 import android.view.View;
-import android.view.Window;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
-import android.widget.Button;
+import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.widget.AbsoluteLayout;
 import android.widget.ImageButton;
-import android.widget.ListView;
+import android.widget.ImageView;
+import android.widget.RelativeLayout;
 import android.widget.SeekBar;
-import android.widget.SeekBar.OnSeekBarChangeListener;
-import android.widget.Switch;
-import android.widget.TextView;
 import android.os.Handler;
 import android.util.Log;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.widget.Toast;
-
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-
+import android.content.ClipData;
 
 public class MainActivity extends ActionBarActivity {
 
@@ -59,6 +51,8 @@ public class MainActivity extends ActionBarActivity {
     // Key names received from the BluetoothChatService Handler
     public static final String DEVICE_NAME = "device_name";
     public static final String DEVICE_ADDRESS = "device_address";
+    public static final String APAD_DELTAY = "apad_delta_y";
+    public static final String APAD_DELTAX = "apad_delta_x";
     public static final String TOAST = "toast";
 
     private BluetoothAdapter mBluetoothAdapter;
@@ -66,16 +60,91 @@ public class MainActivity extends ActionBarActivity {
     private String mConnectedDeviceName = null;
     private String mConnectedDeviceAddress = null;
 
-    private int progress = 0;
-    private int lastProgress = 0;
-    private int currentTime = 0;
-    private final Handler rHandler = new Handler();
-
-    private SeekBar powerBar;
+    private final Handler mHandler;
 
     private Resources res;
     Menu menu;
-    //MenuItem connectButton;
+
+    private ImageView apadButton;
+    private ImageView apadBackground;
+    private ImageView crossView;
+    private ImageView xAxis;
+    private ImageView yAxis;
+    private ImageView pixelView;
+
+    int windowwidth;
+    int windowheight;
+    float xAxisZero = 0;
+    float yAxisZero = 0;
+    int apadThumbWidth;
+    int apadThumbHeight;
+    int apadBackgroundWidth;
+    int apadBackgroundHeight;
+    int apadMaxDeltaY;
+    int apadMaxDeltaX;
+    int dragStartX;
+    int dragStartY;
+    int w,h,w2,h2;
+
+    // Create a string for the ImageView label
+    private static final String IMAGEVIEW_TAG = "icon bitmap";
+
+    public MainActivity() {
+        // The Handler that gets information back from the BluetoothChatService
+        mHandler = new Handler() {
+            @Override
+            public void handleMessage(Message msg) {
+                MenuItem connectButton;
+
+                switch (msg.what) {
+                    case MESSAGE_STATE_CHANGE:
+                        switch (msg.arg1) {
+                            case BluetoothSerialService.STATE_CONNECTED:
+                                setProgressBarIndeterminateVisibility(false);
+                                setTitle(String.format(res.getString(R.string.CONNECTED), mConnectedDeviceName));
+                                connectButton = menu.findItem(R.id.action_connect).setIcon(R.drawable.led_green);
+                                break;
+                            case BluetoothSerialService.STATE_CONNECTING:
+                                setTitle(R.string.CONNECTING);
+                                break;
+                            case BluetoothSerialService.STATE_LISTEN:
+                            case BluetoothSerialService.STATE_NONE:
+                                setTitle(R.string.NOT_CONNECTED);
+                                connectButton = menu.findItem(R.id.action_connect).setIcon(R.drawable.led_red);
+                                break;
+                        }
+                        break;
+                    case MESSAGE_POWER_CHANGE:
+                        float deltaY = msg.getData().getFloat(APAD_DELTAY);
+                        float percent = (deltaY * 100) / apadMaxDeltaY;
+
+                        // TODO: Better algorythm to control the speed (less linear)
+                        if (percent < 0) {
+                         percent = 0;
+                        } else if (percent > 99) {
+                            percent = 99;
+                        }
+
+                        char ch = (char) (percent + 49); // ascii values sent must be between 49 and 149
+                        sendAscii(Character.toString(ch));
+                        break;
+                    case MESSAGE_WRITE:
+                        break;
+                    case MESSAGE_READ:
+                        break;
+                    case MESSAGE_DEVICE_INFO:
+                        // save the connected device's name
+                        mConnectedDeviceName = msg.getData().getString(DEVICE_NAME);
+                        mConnectedDeviceAddress = msg.getData().getString(DEVICE_ADDRESS);
+                        break;
+                    case MESSAGE_TOAST:
+                        Toast.makeText(getApplicationContext(), msg.getData().getString(TOAST),
+                                Toast.LENGTH_SHORT).show();
+                        break;
+                }
+            }
+        };
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -96,40 +165,144 @@ public class MainActivity extends ActionBarActivity {
             return;
         }
 
-        // Get seekBar component
-        powerBar = (SeekBar) findViewById(R.id.powerBar);
-        ImageButton boostButton = (ImageButton) findViewById(R.id.boostButton);
+        apadButton = (ImageView) findViewById(R.id.apadThumb) ;
+        apadBackground = (ImageView) findViewById(R.id.apadBackground) ;
 
-        // set the value to 0
-        powerBar.setProgress(0);
-        powerBar.setMax(99);
+        pixelView = (ImageView) findViewById(R.id.pixelView) ;
 
-        // Establish a listener
-        powerBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+        crossView = (ImageView) findViewById(R.id.crossView) ;
+        xAxis = (ImageView) findViewById(R.id.xAxis) ;
+        yAxis = (ImageView) findViewById(R.id.yAxis) ;
+
+        windowwidth = getWindowManager().getDefaultDisplay().getWidth();
+        windowheight = getWindowManager().getDefaultDisplay().getHeight();
+
+        //SurfaceView sView = (SurfaceView) findViewById(R.id.surfaceView);
+
+        apadThumbWidth = apadButton.getLayoutParams().width;
+        apadThumbHeight = apadButton.getLayoutParams().height;
+
+        apadBackgroundWidth = apadBackground.getLayoutParams().width;
+        apadBackgroundHeight = apadBackground.getLayoutParams().height;
+
+
+        apadMaxDeltaX = apadBackgroundWidth / 2 - 15;
+        apadMaxDeltaY = apadBackgroundHeight / 2 - 15;
+
+        w = crossView.getLayoutParams().width;
+        h = crossView.getLayoutParams().height;
+
+        w2 = xAxis.getLayoutParams().width;
+        h2 = yAxis.getLayoutParams().height;
+
+
+        Log.v(TAG, String.valueOf(w));
+        Log.v(TAG, String.valueOf(h));
+
+        apadButton.setOnTouchListener(new View.OnTouchListener() {
 
             @Override
-            public void onProgressChanged(SeekBar seekBar, int progressValue, boolean fromUser) {
-                progress = progressValue;
-                char ch = (char) (progress + 49); // ascii values sent must be between 49 and 149
-                sendMessage(Character.toString(ch));
-            }
+            public boolean onTouch(View v, MotionEvent event) {
+                Message msg;
+                Bundle bundle;
 
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {
-                rHandler.removeCallbacks(decreasePower);
-            }
+                switch (event.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                        if (xAxisZero == 0 && yAxisZero ==0) {
+                            xAxisZero = apadButton.getX() + apadThumbWidth / 2;
+                            yAxisZero = apadButton.getY() + apadThumbHeight / 2;
 
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
-                sendMessage("0"); //48
 
-                lastProgress = progress;
-                //rHandler.postDelayed(decreasePower, 50);
-                progress = 0;
-                powerBar.setProgress(0);
+                            Log.v(TAG, "Xzero " + String.valueOf(xAxisZero));
+                            Log.v(TAG, "Yzero " + String.valueOf(yAxisZero));
+
+                            pixelView.setX(xAxisZero);
+                            pixelView.setY(yAxisZero);
+
+                            xAxis.setX(xAxisZero);
+                            xAxis.setY(yAxisZero);
+                            yAxis.setX(xAxisZero);
+                            yAxis.setY(yAxisZero);
+
+                            crossView.setX(xAxisZero - w / 2);
+                            crossView.setY(yAxisZero - h / 2);
+
+                        }
+
+                        dragStartX = (int) event.getRawX();
+                        dragStartY = (int) event.getRawY();
+                        break;
+                    case MotionEvent.ACTION_MOVE:
+                        float ptx = event.getRawX();
+                        float pty = event.getRawY();
+
+                        int deltaX = dragStartX - (int) ptx;
+                        int deltaY = dragStartY - (int) pty;
+
+                        Log.v(TAG, String.valueOf(xAxisZero) + "/" + String.valueOf(ptx) + " , " +  String.valueOf(yAxisZero) + "/" + String.valueOf(pty));
+
+                        if (!inCircle(xAxisZero, yAxisZero, apadMaxDeltaY, xAxisZero - deltaX, yAxisZero - deltaY )) {
+                            Point pt = getPointOnTheCircle(xAxisZero, yAxisZero, apadMaxDeltaY, ptx, pty);
+                            //Log.v(TAG, "Out");
+                            //deltaX = dragStartX - pt.x;
+                            //deltaY = dragStartY - pt.y;
+
+                            crossView.setX(pt.x - w / 2);
+                            crossView.setY(pt.y - h / 2);
+                            //deltaX = 0;
+                            //deltaY = 0;
+                        } else {
+                            crossView.setX(xAxisZero - deltaX - w / 2);
+                            crossView.setY(yAxisZero - deltaY - h / 2);
+                        }
+
+                        xAxis.setX(xAxisZero - deltaX);
+                        yAxis.setY(yAxisZero - deltaY);
+
+                        apadButton.setX(xAxisZero - deltaX - apadThumbWidth / 2);
+                        apadButton.setY(yAxisZero - deltaY - apadThumbHeight / 2);
+
+                        // Send message to the activity to update the motor progress
+                        msg = mHandler.obtainMessage(MainActivity.MESSAGE_POWER_CHANGE);
+                        bundle = new Bundle();
+                        bundle.putFloat(MainActivity.APAD_DELTAY, deltaY);
+                        bundle.putFloat(MainActivity.APAD_DELTAX, deltaX);
+                        msg.setData(bundle);
+                        mHandler.sendMessage(msg);
+                        break;
+                    case MotionEvent.ACTION_UP:
+                        // Reset the dpap position
+                        apadButton.setY(yAxisZero - apadThumbWidth / 2 );
+                        apadButton.setX(xAxisZero - apadThumbHeight / 2);
+
+                        xAxis.setX(xAxisZero);
+                        xAxis.setY(yAxisZero);
+
+                        yAxis.setX(xAxisZero);
+                        yAxis.setY(yAxisZero);
+
+                        crossView.setX(xAxisZero - w / 2);
+                        crossView.setY(yAxisZero - h / 2);
+
+
+                        msg = mHandler.obtainMessage(MainActivity.MESSAGE_POWER_CHANGE);
+                        bundle = new Bundle();
+                        bundle.putFloat(MainActivity.APAD_DELTAY, 0);
+                        bundle.putFloat(MainActivity.APAD_DELTAX, 0);
+                        msg.setData(bundle);
+                        mHandler.sendMessage(msg);
+                        break;
+                    default:
+                        break;
+                }
+                return true;
             }
         });
 
+        // Get boost button from ressource id
+        ImageButton boostButton = (ImageButton) findViewById(R.id.boostButton);
+
+        // Assign click handler
         boostButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View arg0) {
@@ -173,13 +346,6 @@ public class MainActivity extends ActionBarActivity {
             } else if (mBluetoothService.getState() == BluetoothSerialService.STATE_CONNECTED) {
                 Log.v(TAG, "STATE_CONNECTED");
             }
-
-             /*if (mBluetoothService.getState() == BluetoothSerialService.STATE_NONE) {
-                mBluetoothService.start();
-             } else {
-                menu.findItem(R.id.action_connect).setIcon(R.drawable.led_red).setIcon(R.drawable.led_green);
-                setTitle(String.format(res.getString(R.string.CONNECTED), mConnectedDeviceName));
-            }*/
         }
 
     }
@@ -204,45 +370,6 @@ public class MainActivity extends ActionBarActivity {
         if (mBluetoothService != null) mBluetoothService.stop();
     }
 
-    // The Handler that gets information back from the BluetoothChatService
-    private final Handler mHandler = new Handler() {
-        @Override
-        public void handleMessage(Message msg) {
-            MenuItem connectButton;
-
-            switch (msg.what) {
-                case MESSAGE_STATE_CHANGE:
-                    switch (msg.arg1) {
-                        case BluetoothSerialService.STATE_CONNECTED:
-                            setTitle(String.format(res.getString(R.string.CONNECTED), mConnectedDeviceName));
-                            connectButton = menu.findItem(R.id.action_connect).setIcon(R.drawable.led_green);
-                            break;
-                        case BluetoothSerialService.STATE_CONNECTING:
-                            setTitle(R.string.CONNECTING);
-                            break;
-                        case BluetoothSerialService.STATE_LISTEN:
-                        case BluetoothSerialService.STATE_NONE:
-                            setTitle(R.string.NOT_CONNECTED);
-                            connectButton = menu.findItem(R.id.action_connect).setIcon(R.drawable.led_red);
-                            break;
-                    }
-                    break;
-                case MESSAGE_WRITE:
-                    break;
-                case MESSAGE_READ:
-                    break;
-                case MESSAGE_DEVICE_INFO:
-                    // save the connected device's name
-                    mConnectedDeviceName = msg.getData().getString(DEVICE_NAME);
-                    mConnectedDeviceAddress = msg.getData().getString(DEVICE_ADDRESS);
-                    break;
-                case MESSAGE_TOAST:
-                    Toast.makeText(getApplicationContext(), msg.getData().getString(TOAST),
-                            Toast.LENGTH_SHORT).show();
-                    break;
-            }
-        }
-    };
 
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         switch (requestCode) {
@@ -284,7 +411,7 @@ public class MainActivity extends ActionBarActivity {
      * Sends a message.
      * @param message  A string of text to send.
      */
-    private void sendMessage(String message) {
+    private void sendAscii(String message) {
         // Check that we're actually connected before trying anything
         if (mBluetoothService.getState() != BluetoothSerialService.STATE_CONNECTED) {
             return;
@@ -298,26 +425,69 @@ public class MainActivity extends ActionBarActivity {
         }
     }
 
-    private double ease(int t, int b, int c, int d) {
-        Log.v(TAG, "Ease = " + String.valueOf(t) + ' ' + String.valueOf(b) + ' ' + String.valueOf(c) + ' ' + String.valueOf(d));
-        //double v = 1.70158;
-        //return Math.round(c * ((t = t / d - 1) * t * ((v + 1) * t + v) + 1) + b);
-        return c * (Math.pow(t / d - 1, 3) + 1) + b;
+    public boolean inCircle(float center_x, float center_y, float radius, float x, float y) {
+        double square_dist = Math.pow(center_x - x,2) + Math.pow(center_y - y, 2);
+        return square_dist <= Math.pow(radius, 2);
     }
 
-    private Runnable decreasePower = new Runnable() {
-        public void run() {
-            progress = (int) Math.floor(lastProgress + (-lastProgress * ease(currentTime, 0 , 1, 100)));
-            powerBar.setProgress(progress);
-            currentTime++;
-            Log.v("BTCircuit24", "CurrentTime = " + String.valueOf(currentTime));
-            if (progress > 0 && currentTime < 100) {
-                rHandler.postDelayed(this, 1);
-            }
-            //textView.setText("Covered: " + progress + "/" + powerBar.getMax());
-        }
-    };
+    public Point getPointOnTheCircle(float cx, float cy, float r, float ptx, float pty) {
+        double x = 0, y = 0;
+        double a = 0;
+        double ntd = Math.toRadians(90);
 
+       //if (ptx < cx && pty < cy) {
+
+            //h = Math.sqrt( (double) (Math.pow(ptx-cx, 2) + Math.pow(pty-cy, 2)));
+            //sina = (cy-pty) / h;
+            //cosa = (cx-ptx) / h;
+        if (ptx == cx && pty > cy) {
+            x = cx;
+            y = cy + r;
+        } else if (pty == cy && ptx > cx) {
+            x = cx + r;
+            y = cy;
+        } else if (ptx == cx && pty < cy) {
+            x = cx;
+            y = cy - r;
+        } else if (pty == cy && ptx < cx) {
+            x = cx - r;
+            y = cy;
+        } else if (ptx < cx && pty > cy) {
+            a = Math.atan2(pty - cy , cx - ptx);
+            x = cx - r * Math.cos(a);
+            y = cy + r * Math.sin(a);
+             Log.v(TAG, "Q " + String.valueOf(cx) + " / " + String.valueOf(x) + " : " + String.valueOf(cy) + " / " + String.valueOf(y));
+        } else if (ptx > cx && pty > cy) {
+            a = Math.atan2(pty - cy , ptx - cx);
+            x = cx + r * Math.cos(a);
+            y = cy + r * Math.sin(a);
+            Log.v(TAG, "Q1 "+ String.valueOf(Math.toDegrees(a)));
+        } else if (ptx > cx && pty < cy) {
+            a = ntd + Math.atan2(Math.abs(cy - pty) , Math.abs(ptx - cx));
+            x = cx + r * Math.cos(a);
+            y = cy + r * Math.sin(a);
+            Log.v(TAG, "Q "+ String.valueOf(Math.toDegrees(a)));
+        } else if (ptx < cx && pty < cy) {
+            a = ntd + Math.atan2(Math.abs(cy - pty) , Math.abs(ptx - cx));
+            x = cx + r * Math.cos(a);
+            y = cy + r * Math.sin(a);
+            Log.v(TAG, "Q "+ String.valueOf(Math.toDegrees(a)));
+        }
+
+        //xx
+        //a += Math.atan2(Math.abs(cy - pty) , Math.abs(ptx - cx));
+
+
+
+        //Log.v(TAG, "a = " + String.valueOf(Math.toDegrees(a)));
+
+        //Log.v(TAG, "SIN(a) " + String.valueOf(sina));
+        //Log.v(TAG, "COS(a) " + String.valueOf(cosa));
+        /*Log.v(TAG, "x " + x);
+        Log.v(TAG, "y " + y);*/
+
+        return new Point((int) Math.round(x), (int)Math.round(y));
+    }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -338,16 +508,19 @@ public class MainActivity extends ActionBarActivity {
         switch (id) {
 
             case R.id.action_settings :
-                // Launch the DeviceListActivity to see devices and do scan
+                // Launch the settings activity
                 serverIntent = new Intent(this, SettingsActivity.class);
                 startActivityForResult(serverIntent, 0);
                 return true;
             case R.id.action_connect :
                 if (mBluetoothService != null) {
+                    // If not connected to a remote, then launch the DeviceListActivity to see devices and do scan
                     if (mBluetoothService.getState() != BluetoothSerialService.STATE_CONNECTED) {
+                        setProgressBarIndeterminateVisibility(true); // not working
                         serverIntent = new Intent(this, DeviceListActivity.class);
                         startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE);
                     } else {
+                        // Otherwise close the existing connection
                         BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(mConnectedDeviceAddress);
                         mBluetoothService.stop();
                     }

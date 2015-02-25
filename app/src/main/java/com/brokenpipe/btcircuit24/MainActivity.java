@@ -70,6 +70,8 @@ public class MainActivity extends ActionBarActivity {
     private int maxPower = 100;
     private boolean limitPower = false;
 
+    private boolean reverse = false;
+
     private ImageView crossView;
     private ImageView xAxis;
     private ImageView yAxis;
@@ -206,7 +208,6 @@ public class MainActivity extends ActionBarActivity {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
                 Message msg;
-                Bundle bundle;
 
                 switch (event.getAction()) {
                     case MotionEvent.ACTION_DOWN:
@@ -233,12 +234,12 @@ public class MainActivity extends ActionBarActivity {
                     case MotionEvent.ACTION_MOVE:
 
                         // If reverse button is pressed then send special value to the arduino
-                        if (revertButton.isPressed()) {
+                        /*if (revertButton.isPressed()) {
                             curPower = 101;
-                            msg = mHandler.obtainMessage(MainActivity.MESSAGE_POWER_CHANGE);
+                            msg = mHandler.obtainMessage(MESSAGE_POWER_CHANGE);
                             mHandler.sendMessage(msg);
                             break;
-                        }
+                        }*/
 
                         float ptx = event.getRawX();
                         float pty = event.getRawY();
@@ -272,7 +273,7 @@ public class MainActivity extends ActionBarActivity {
                         curPower = (deltaY * 100) / apadMaxDeltaY;
 
                         if (curPower > 0) {
-                            curPower += 50;
+                            curPower += 20;
                         }
 
                         if (curPower < 0) {
@@ -289,10 +290,10 @@ public class MainActivity extends ActionBarActivity {
 
                         // if boost button is pressed then override the power value
                         if (boostButton.isPressed()) {
-                            curPower = 100;
+                            curPower = 99;
                         }
                         // Send message to the activity to update the motor progress
-                        msg = mHandler.obtainMessage(MainActivity.MESSAGE_POWER_CHANGE);
+                        msg = mHandler.obtainMessage(MESSAGE_POWER_CHANGE);
                         mHandler.sendMessage(msg);
                         break;
                     case MotionEvent.ACTION_UP:
@@ -310,7 +311,7 @@ public class MainActivity extends ActionBarActivity {
                         crossView.setY(yAxisZero - h / 2);
 
                         curPower = 0;
-                        msg = mHandler.obtainMessage(MainActivity.MESSAGE_POWER_CHANGE);
+                        msg = mHandler.obtainMessage(MESSAGE_POWER_CHANGE);
                         mHandler.sendMessage(msg);
                         break;
                     default:
@@ -341,11 +342,27 @@ public class MainActivity extends ActionBarActivity {
         // Set the enabled state from the stored preferences
         revertButton.setEnabled(preferences.getBoolean("enable_reverse_button", true));
 
+        //revertButton.setPressed(true);
         // Assign click handler
         revertButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View arg0) {
-                curPower = 101;
+
+                Log.v(TAG, "Click");
+
+                if (reverse == false) {
+                    curPower = 102;
+                    Message msg = mHandler.obtainMessage(MESSAGE_POWER_CHANGE);
+                    mHandler.sendMessage(msg);
+                    reverse = true;
+                    revertButton.setPressed(true);
+                } else {
+                    curPower = 103;
+                    Message msg = mHandler.obtainMessage(MESSAGE_POWER_CHANGE);
+                    mHandler.sendMessage(msg);
+                    reverse = false;
+                    revertButton.setPressed(false);
+                }
             }
 
         });

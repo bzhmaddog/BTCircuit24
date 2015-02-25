@@ -1,37 +1,30 @@
 package com.brokenpipe.btcircuit24;
 
 import android.app.Activity;
-import android.content.ClipData;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.graphics.Point;
-import android.graphics.Rect;
 import android.os.Message;
+import android.preference.PreferenceManager;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
-import android.view.DragEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
-import android.view.SurfaceView;
 import android.view.View;
-import android.view.ViewGroup;
-import android.view.WindowManager;
-import android.widget.AbsoluteLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
-import android.widget.RelativeLayout;
-import android.widget.SeekBar;
 import android.os.Handler;
 import android.util.Log;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.widget.Toast;
-import android.content.ClipData;
+
 
 public class MainActivity extends ActionBarActivity {
 
-    private static final String TAG = "BTcircuit24";
+    public static final String TAG = "BTcircuit24";
     private static final boolean D = true;
 
     private static final int REQUEST_CONNECT_DEVICE = 1;
@@ -55,6 +48,8 @@ public class MainActivity extends ActionBarActivity {
     public static final String APAD_DELTAX = "apad_delta_x";
     public static final String TOAST = "toast";
 
+    SharedPreferences preferences;
+
     private BluetoothAdapter mBluetoothAdapter;
     private BluetoothSerialService mBluetoothService = null;
     private String mConnectedDeviceName = null;
@@ -67,6 +62,14 @@ public class MainActivity extends ActionBarActivity {
 
     private ImageView apadButton;
     private ImageView apadBackground;
+
+    private ImageButton boostButton;
+    private ImageButton revertButton;
+
+    private int curPower = 0;
+    private int maxPower = 100;
+    private boolean limitPower = false;
+
     private ImageView crossView;
     private ImageView xAxis;
     private ImageView yAxis;
@@ -103,6 +106,7 @@ public class MainActivity extends ActionBarActivity {
                                 setProgressBarIndeterminateVisibility(false);
                                 setTitle(String.format(res.getString(R.string.CONNECTED), mConnectedDeviceName));
                                 connectButton = menu.findItem(R.id.action_connect).setIcon(R.drawable.led_green);
+                                sendAscii("0");
                                 break;
                             case BluetoothSerialService.STATE_CONNECTING:
                                 setTitle(R.string.CONNECTING);
@@ -115,17 +119,10 @@ public class MainActivity extends ActionBarActivity {
                         }
                         break;
                     case MESSAGE_POWER_CHANGE:
-                        float deltaY = msg.getData().getFloat(APAD_DELTAY);
-                        float percent = (deltaY * 100) / apadMaxDeltaY;
 
-                        // TODO: Better algorythm to control the speed (less linear)
-                        if (percent < 0) {
-                         percent = 0;
-                        } else if (percent > 99) {
-                            percent = 99;
-                        }
+                        Log.v(TAG, String.valueOf(curPower));
 
-                        char ch = (char) (percent + 49); // ascii values sent must be between 49 and 149
+                        char ch = (char) (curPower + 49); // ascii values sent must be between 49 and 149
                         sendAscii(Character.toString(ch));
                         break;
                     case MESSAGE_WRITE:
@@ -156,6 +153,11 @@ public class MainActivity extends ActionBarActivity {
 
         res = getResources();
 
+        preferences = PreferenceManager.getDefaultSharedPreferences(this);
+
+        // get preferences for power value limitation
+        limitPower = preferences.getBoolean("limit_power", false);
+        maxPower = preferences.getInt("max_power_value", 100);
 
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
@@ -212,10 +214,6 @@ public class MainActivity extends ActionBarActivity {
                             xAxisZero = apadButton.getX() + apadThumbWidth / 2;
                             yAxisZero = apadButton.getY() + apadThumbHeight / 2;
 
-
-                            Log.v(TAG, "Xzero " + String.valueOf(xAxisZero));
-                            Log.v(TAG, "Yzero " + String.valueOf(yAxisZero));
-
                             pixelView.setX(xAxisZero);
                             pixelView.setY(yAxisZero);
 
@@ -233,6 +231,15 @@ public class MainActivity extends ActionBarActivity {
                         dragStartY = (int) event.getRawY();
                         break;
                     case MotionEvent.ACTION_MOVE:
+
+                        // If reverse button is pressed then send special value to the arduino
+                        if (revertButton.isPressed()) {
+                            curPower = 101;
+                            msg = mHandler.obtainMessage(MainActivity.MESSAGE_POWER_CHANGE);
+                            mHandler.sendMessage(msg);
+                            break;
+                        }
+
                         float ptx = event.getRawX();
                         float pty = event.getRawY();
 
@@ -250,7 +257,7 @@ public class MainActivity extends ActionBarActivity {
                             crossView.setX(pt.x - w / 2);
                             crossView.setY(pt.y - h / 2);
                             //deltaX = 0;
-                            //deltaY = 0;
+                            deltaY = apadMaxDeltaY;
                         } else {
                             crossView.setX(xAxisZero - deltaX - w / 2);
                             crossView.setY(yAxisZero - deltaY - h / 2);
@@ -262,12 +269,30 @@ public class MainActivity extends ActionBarActivity {
                         apadButton.setX(xAxisZero - deltaX - apadThumbWidth / 2);
                         apadButton.setY(yAxisZero - deltaY - apadThumbHeight / 2);
 
+                        curPower = (deltaY * 100) / apadMaxDeltaY;
+
+                        if (curPower > 0) {
+                            curPower += 50;
+                        }
+
+                        if (curPower < 0) {
+                            curPower = 0;
+                        } else if (curPower > 100) {
+                            curPower = 100;
+                        }
+
+                        // limit the power if the limiter is enabled
+                        if (limitPower && curPower > maxPower) {
+                            curPower = maxPower;
+                        }
+
+
+                        // if boost button is pressed then override the power value
+                        if (boostButton.isPressed()) {
+                            curPower = 100;
+                        }
                         // Send message to the activity to update the motor progress
                         msg = mHandler.obtainMessage(MainActivity.MESSAGE_POWER_CHANGE);
-                        bundle = new Bundle();
-                        bundle.putFloat(MainActivity.APAD_DELTAY, deltaY);
-                        bundle.putFloat(MainActivity.APAD_DELTAX, deltaX);
-                        msg.setData(bundle);
                         mHandler.sendMessage(msg);
                         break;
                     case MotionEvent.ACTION_UP:
@@ -284,12 +309,8 @@ public class MainActivity extends ActionBarActivity {
                         crossView.setX(xAxisZero - w / 2);
                         crossView.setY(yAxisZero - h / 2);
 
-
+                        curPower = 0;
                         msg = mHandler.obtainMessage(MainActivity.MESSAGE_POWER_CHANGE);
-                        bundle = new Bundle();
-                        bundle.putFloat(MainActivity.APAD_DELTAY, 0);
-                        bundle.putFloat(MainActivity.APAD_DELTAX, 0);
-                        msg.setData(bundle);
                         mHandler.sendMessage(msg);
                         break;
                     default:
@@ -300,15 +321,35 @@ public class MainActivity extends ActionBarActivity {
         });
 
         // Get boost button from ressource id
-        ImageButton boostButton = (ImageButton) findViewById(R.id.boostButton);
+        boostButton = (ImageButton) findViewById(R.id.boostButton);
+
+        // Set the enabled state from the stored preferences
+        boostButton.setEnabled(preferences.getBoolean("enable_boost_button", false) && preferences.getBoolean("limit_power", false));
 
         // Assign click handler
-        boostButton.setOnClickListener(new View.OnClickListener() {
+        /*boostButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View arg0) {
             }
 
+        });*/
+
+
+        // Get boost button from ressource id
+        revertButton = (ImageButton) findViewById(R.id.revertButton);
+
+        // Set the enabled state from the stored preferences
+        revertButton.setEnabled(preferences.getBoolean("enable_reverse_button", true));
+
+        // Assign click handler
+        revertButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View arg0) {
+                curPower = 101;
+            }
+
         });
+
     }
 
     @Override
@@ -396,7 +437,11 @@ public class MainActivity extends ActionBarActivity {
                 break;
             case SETTINGS_CHANGED:
                 // refresh settings
-        }
+                boostButton.setEnabled(preferences.getBoolean("enable_boost_button", false) && preferences.getBoolean("limit_power", false));
+                revertButton.setEnabled(preferences.getBoolean("enable_reverse_button", true));
+                limitPower = preferences.getBoolean("limit_power", false);
+                maxPower = preferences.getInt("max_power_value", 100);
+           }
     }
 
     private void connectToDevice(String address) {
@@ -416,6 +461,8 @@ public class MainActivity extends ActionBarActivity {
         if (mBluetoothService.getState() != BluetoothSerialService.STATE_CONNECTED) {
             return;
         }
+
+        Log.v(TAG, "SendAscii : " + message);
 
         // Check that there's actually something to send
         if (message.length() > 0) {
@@ -456,22 +503,22 @@ public class MainActivity extends ActionBarActivity {
             a = Math.atan2(pty - cy , cx - ptx);
             x = cx - r * Math.cos(a);
             y = cy + r * Math.sin(a);
-             Log.v(TAG, "Q " + String.valueOf(cx) + " / " + String.valueOf(x) + " : " + String.valueOf(cy) + " / " + String.valueOf(y));
+             //Log.v(TAG, "Q " + String.valueOf(cx) + " / " + String.valueOf(x) + " : " + String.valueOf(cy) + " / " + String.valueOf(y));
         } else if (ptx > cx && pty > cy) {
             a = Math.atan2(pty - cy , ptx - cx);
             x = cx + r * Math.cos(a);
             y = cy + r * Math.sin(a);
-            Log.v(TAG, "Q1 "+ String.valueOf(Math.toDegrees(a)));
+            //Log.v(TAG, "Q1 "+ String.valueOf(Math.toDegrees(a)));
         } else if (ptx > cx && pty < cy) {
             a = ntd + Math.atan2(Math.abs(cy - pty) , Math.abs(ptx - cx));
             x = cx + r * Math.cos(a);
             y = cy + r * Math.sin(a);
-            Log.v(TAG, "Q "+ String.valueOf(Math.toDegrees(a)));
+            //Log.v(TAG, "Q "+ String.valueOf(Math.toDegrees(a)));
         } else if (ptx < cx && pty < cy) {
             a = ntd + Math.atan2(Math.abs(cy - pty) , Math.abs(ptx - cx));
             x = cx + r * Math.cos(a);
             y = cy + r * Math.sin(a);
-            Log.v(TAG, "Q "+ String.valueOf(Math.toDegrees(a)));
+            //Log.v(TAG, "Q "+ String.valueOf(Math.toDegrees(a)));
         }
 
         //xx
@@ -509,8 +556,8 @@ public class MainActivity extends ActionBarActivity {
 
             case R.id.action_settings :
                 // Launch the settings activity
-                serverIntent = new Intent(this, SettingsActivity.class);
-                startActivityForResult(serverIntent, 0);
+                serverIntent = new Intent(this, com.brokenpipe.btcircuit24.SettingsActivity.class);
+                startActivityForResult(serverIntent, SETTINGS_CHANGED);
                 return true;
             case R.id.action_connect :
                 if (mBluetoothService != null) {

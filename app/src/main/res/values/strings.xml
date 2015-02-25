@@ -16,4 +16,44 @@
     <string name="DEVICE_LIST_ACTIVITY_NO_DEVICE_FOUND">No Device found</string>
     <string name="DEVICE_LIST_ACTIVITY_NO_PAIRED_DEVICE">No paired Devices</string>
     <string name="NO_BLUETOOTH_ADAPTER">Bluetooth is not available</string>
+
+    <string name="title_activity_settings">Settings</string>
+
+    <!-- Strings related to Settings -->
+
+    <!-- Example General settings -->
+    <string name="pref_header_general">General</string>
+
+    <string name="pref_title_social_recommendations">Enable social recommendations</string>
+    <string name="pref_description_social_recommendations">Recommendations for people to contact
+        based on your message history
+    </string>
+
+    <string name="pref_title_display_name">Display name</string>
+    <string name="pref_default_display_name">John Smith</string>
+
+    <string name="pref_title_add_friends_to_messages">Add friends to messages</string>
+    <string-array name="pref_example_list_titles">
+        <item>Always</item>
+        <item>When possible</item>
+        <item>Never</item>
+    </string-array>
+    <string-array name="pref_example_list_values">
+        <item>1</item>
+        <item>0</item>
+        <item>-1</item>
+    </string-array>
+
+    <string name="pref_title_enable_power_limitation">Limit maximum speed</string>
+    <string name="pref_description_power_limitation">Enable cruise control to prevent car going out of the track</string>
+    <string name="pref_title_max_power">Maximum power (%)</string>
+    <string name="pref_max_power_dialog_title">Maximum power</string>
+    <string name="pref_max_power_dialog_summary">Limit Maximum power to %d percent</string>
+
+    <string name="pref_title_enable_boot_button">Enable power boost button</string>
+    <string name="pref_description_boost_button">Pressing boost button will override the power limitation and deliver 100% of the power to the motor</string>
+
+    <string name="pref_title_enable_reverse_button">Enable direction reverse button</string>
+    <string name="pref_description_reverse_button">Pressing reverse button will make the car go backward</string>
+
 </resources>

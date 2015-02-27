@@ -122,7 +122,7 @@ public class MainActivity extends ActionBarActivity {
                         break;
                     case MESSAGE_POWER_CHANGE:
 
-                        Log.v(TAG, String.valueOf(curPower));
+                        //Log.v(TAG, String.valueOf(curPower));
 
                         char ch = (char) (curPower + 49); // ascii values sent must be between 49 and 149
                         sendAscii(Character.toString(ch));
@@ -178,7 +178,7 @@ public class MainActivity extends ActionBarActivity {
         xAxis = (ImageView) findViewById(R.id.xAxis) ;
         yAxis = (ImageView) findViewById(R.id.yAxis) ;
 
-        windowwidth = getWindowManager().getDefaultDisplay().getWidth();
+        //windowwidth = getWindowManager().getDefaultDisplay().getWidth();
         windowheight = getWindowManager().getDefaultDisplay().getHeight();
 
         //SurfaceView sView = (SurfaceView) findViewById(R.id.surfaceView);
@@ -186,22 +186,23 @@ public class MainActivity extends ActionBarActivity {
         apadThumbWidth = apadButton.getLayoutParams().width;
         apadThumbHeight = apadButton.getLayoutParams().height;
 
-        apadBackgroundWidth = apadBackground.getLayoutParams().width;
+        //apadBackgroundWidth = apadBackground.getLayoutParams().width;
         apadBackgroundHeight = apadBackground.getLayoutParams().height;
 
+        apadButton.setY(apadButton.getY() + apadThumbHeight / 2);
 
-        apadMaxDeltaX = apadBackgroundWidth / 2 - 15;
-        apadMaxDeltaY = apadBackgroundHeight / 2 - 15;
+        //apadMaxDeltaX = apadBackgroundWidth / 2 - 15;
+        apadMaxDeltaY = apadBackgroundHeight;
 
-        w = crossView.getLayoutParams().width;
-        h = crossView.getLayoutParams().height;
+        //w = crossView.getLayoutParams().width;
+        //h = crossView.getLayoutParams().height;
 
-        w2 = xAxis.getLayoutParams().width;
-        h2 = yAxis.getLayoutParams().height;
+        //w2 = xAxis.getLayoutParams().width;
+        //h2 = yAxis.getLayoutParams().height;
 
 
-        Log.v(TAG, String.valueOf(w));
-        Log.v(TAG, String.valueOf(h));
+        //Log.v(TAG, String.valueOf(w));
+        //Log.v(TAG, String.valueOf(h));
 
         apadButton.setOnTouchListener(new View.OnTouchListener() {
 
@@ -212,19 +213,19 @@ public class MainActivity extends ActionBarActivity {
                 switch (event.getAction()) {
                     case MotionEvent.ACTION_DOWN:
                         if (xAxisZero == 0 && yAxisZero ==0) {
-                            xAxisZero = apadButton.getX() + apadThumbWidth / 2;
+                            //xAxisZero = apadButton.getX() + apadThumbWidth / 2;
                             yAxisZero = apadButton.getY() + apadThumbHeight / 2;
 
                             pixelView.setX(xAxisZero);
                             pixelView.setY(yAxisZero);
 
-                            xAxis.setX(xAxisZero);
+                            /*xAxis.setX(xAxisZero);
                             xAxis.setY(yAxisZero);
                             yAxis.setX(xAxisZero);
-                            yAxis.setY(yAxisZero);
+                            yAxis.setY(yAxisZero);*/
 
-                            crossView.setX(xAxisZero - w / 2);
-                            crossView.setY(yAxisZero - h / 2);
+                            /*crossView.setX(xAxisZero - w / 2);
+                            crossView.setY(yAxisZero - h / 2);*/
 
                         }
 
@@ -241,15 +242,13 @@ public class MainActivity extends ActionBarActivity {
                             break;
                         }*/
 
-                        float ptx = event.getRawX();
+                        //float ptx = event.getRawX();
                         float pty = event.getRawY();
 
-                        int deltaX = dragStartX - (int) ptx;
+                        //int deltaX = dragStartX - (int) ptx;
                         int deltaY = dragStartY - (int) pty;
 
-                        Log.v(TAG, String.valueOf(xAxisZero) + "/" + String.valueOf(ptx) + " , " +  String.valueOf(yAxisZero) + "/" + String.valueOf(pty));
-
-                        if (!inCircle(xAxisZero, yAxisZero, apadMaxDeltaY, xAxisZero - deltaX, yAxisZero - deltaY )) {
+                        /*if (!inCircle(xAxisZero, yAxisZero, apadMaxDeltaY, xAxisZero - deltaX, yAxisZero - deltaY )) {
                             Point pt = getPointOnTheCircle(xAxisZero, yAxisZero, apadMaxDeltaY, ptx, pty);
                             //Log.v(TAG, "Out");
                             //deltaX = dragStartX - pt.x;
@@ -262,13 +261,26 @@ public class MainActivity extends ActionBarActivity {
                         } else {
                             crossView.setX(xAxisZero - deltaX - w / 2);
                             crossView.setY(yAxisZero - deltaY - h / 2);
+                        }*/
+
+                        float newY = apadButton.getY();
+
+                        if (Math.abs(deltaY) > apadMaxDeltaY) {
+                            newY = yAxisZero - apadMaxDeltaY;
+                        } else if (deltaY < 0 && newY > yAxisZero - apadThumbHeight / 2) {
+                            newY = yAxisZero - apadThumbHeight / 2;
+                        } else if (deltaY > 0 ) {
+                            newY = yAxisZero - deltaY;
                         }
 
-                        xAxis.setX(xAxisZero - deltaX);
-                        yAxis.setY(yAxisZero - deltaY);
 
-                        apadButton.setX(xAxisZero - deltaX - apadThumbWidth / 2);
-                        apadButton.setY(yAxisZero - deltaY - apadThumbHeight / 2);
+                        Log.v(TAG, String.valueOf(apadMaxDeltaY) + " / " + String.valueOf(deltaY) + "/" + String.valueOf(newY));
+
+                        //xAxis.setX(xAxisZero - deltaX);
+                        //yAxis.setY(newY);
+
+                        //apadButton.setX(xAxisZero - deltaX - apadThumbWidth / 2);
+                        apadButton.setY(newY);
 
                         curPower = (deltaY * 100) / apadMaxDeltaY;
 
@@ -299,16 +311,16 @@ public class MainActivity extends ActionBarActivity {
                     case MotionEvent.ACTION_UP:
                         // Reset the dpap position
                         apadButton.setY(yAxisZero - apadThumbWidth / 2 );
-                        apadButton.setX(xAxisZero - apadThumbHeight / 2);
+                        //apadButton.setX(xAxisZero - apadThumbHeight / 2);
 
-                        xAxis.setX(xAxisZero);
+                        /*xAxis.setX(xAxisZero);
                         xAxis.setY(yAxisZero);
 
                         yAxis.setX(xAxisZero);
                         yAxis.setY(yAxisZero);
 
                         crossView.setX(xAxisZero - w / 2);
-                        crossView.setY(yAxisZero - h / 2);
+                        crossView.setY(yAxisZero - h / 2);*/
 
                         curPower = 0;
                         msg = mHandler.obtainMessage(MESSAGE_POWER_CHANGE);
@@ -326,15 +338,6 @@ public class MainActivity extends ActionBarActivity {
 
         // Set the enabled state from the stored preferences
         boostButton.setEnabled(preferences.getBoolean("enable_boost_button", false) && preferences.getBoolean("limit_power", false));
-
-        // Assign click handler
-        /*boostButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View arg0) {
-            }
-
-        });*/
-
 
         // Get boost button from ressource id
         revertButton = (ImageButton) findViewById(R.id.revertButton);
